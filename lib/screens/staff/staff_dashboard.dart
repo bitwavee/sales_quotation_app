@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../shared/enquiry_list_screen.dart';
 
 class StaffDashboard extends StatelessWidget {
   const StaffDashboard({Key? key}) : super(key: key);
@@ -10,7 +11,7 @@ class StaffDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Enquiries'),
+        title: const Text('My Dashboard'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -18,44 +19,32 @@ class StaffDashboard extends StatelessWidget {
           ),
         ],
       ),
-      body: Center(
+      body: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.assignment_outlined,
-              size: 64,
-              color: AppColors.textLight,
-            ),
-            const SizedBox(height: 16),
             Text(
-              'No enquiries yet',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.textMuted,
-              ),
+              'Welcome, ${context.watch<AuthProvider>().user?.name ?? ''}!',
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => _handleCreateEnquiry(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Create New Enquiry'),
+            ListTile(
+              leading: const Icon(Icons.assignment, color: AppColors.primary),
+              title: const Text('My Enquiries'),
+              subtitle: const Text('View assigned enquiries'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EnquiryListScreen())),
             ),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _handleCreateEnquiry(context),
-        icon: const Icon(Icons.add),
-        label: const Text('New Enquiry'),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EnquiryListScreen())),
+        icon: const Icon(Icons.assignment),
+        label: const Text('Enquiries'),
       ),
     );
-  }
-
-  void _handleCreateEnquiry(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening enquiry form...')),
-    );
-    // TODO: Implement navigation to create enquiry screen
   }
 
   void _handleLogout(BuildContext context) {

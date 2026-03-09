@@ -25,37 +25,43 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> login(String email, String password) async {
+    debugPrint('[AuthProvider] login() called with email: $email');
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       final response = await ApiService.login(email, password);
+      debugPrint('[AuthProvider] ApiService.login() returned: $response');
 
       if (response['success'] == true && response['data'] != null) {
         final data = response['data'] as Map<String, dynamic>;
 
         if (data['user'] != null) {
-          final userData = data['user'] as Map<String, dynamic>;
-          _user = User.fromJson(userData);
+          _user = User.fromJson(data['user'] as Map<String, dynamic>);
+          debugPrint('[AuthProvider] User parsed: ${_user?.email}, role: ${_user?.role}');
         }
 
         if (data['token'] != null) {
           _token = data['token'] as String;
+          debugPrint('[AuthProvider] Token saved (length: ${_token!.length})');
         }
 
         _isLoggedIn = true;
         _error = null;
+        debugPrint('[AuthProvider] Login SUCCESS — navigating...');
         notifyListeners();
         return true;
       } else {
         _error = response['error'] ?? 'Login failed. Please try again.';
+        debugPrint('[AuthProvider] Login FAILED: $_error');
         notifyListeners();
         return false;
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       _error = 'An unexpected error occurred. Please try again.';
-      debugPrint('Login error: $e');
+      debugPrint('[AuthProvider] Login EXCEPTION: $e');
+      debugPrint('[AuthProvider] Stack trace: $stackTrace');
       notifyListeners();
       return false;
     } finally {
@@ -65,10 +71,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await ApiService.logout();
     _user = null;
     _token = null;
     _isLoggedIn = false;
-    await ApiService.logout();
     notifyListeners();
   }
 }

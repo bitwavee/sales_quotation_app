@@ -5,6 +5,7 @@ class User {
   final String? phone;
   final String role;
   final bool isActive;
+  final DateTime? createdAt;
 
   User({
     required this.id,
@@ -13,6 +14,7 @@ class User {
     this.phone,
     required this.role,
     required this.isActive,
+    this.createdAt,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -21,8 +23,11 @@ class User {
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'],
-      role: json['role'] ?? 'STAFF',
+      role: json['role'] ?? 'Staff',
       isActive: json['isActive'] ?? true,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'])
+          : null,
     );
   }
 

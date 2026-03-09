@@ -6,6 +6,7 @@ class Enquiry {
   final String customerPhone;
   final String? customerAddress;
   final String? assignedStaffId;
+  final String? assignedStaff;
   final String status;
   final String? notes;
   final int measurementsCount;
@@ -21,6 +22,7 @@ class Enquiry {
     required this.customerPhone,
     this.customerAddress,
     this.assignedStaffId,
+    this.assignedStaff,
     required this.status,
     this.notes,
     this.measurementsCount = 0,
@@ -32,18 +34,19 @@ class Enquiry {
   factory Enquiry.fromJson(Map<String, dynamic> json) {
     return Enquiry(
       id: json['id'] ?? '',
-      enquiryNumber: json['enquiryNumber'] ?? json['enquiry_number'] ?? '',
-      customerName: json['customerName'] ?? json['customer_name'] ?? '',
-      customerEmail: json['customerEmail'] ?? json['customer_email'],
-      customerPhone: json['customerPhone'] ?? json['customer_phone'] ?? '',
-      customerAddress: json['customerAddress'] ?? json['customer_address'],
-      assignedStaffId: json['assignedStaffId'] ?? json['assigned_staff_id'],
+      enquiryNumber: json['enquiryNumber'] ?? '',
+      customerName: json['customerName'] ?? '',
+      customerEmail: json['customerEmail'],
+      customerPhone: json['customerPhone'] ?? '',
+      customerAddress: json['customerAddress'],
+      assignedStaffId: json['assignedStaffId'],
+      assignedStaff: json['assignedStaff'],
       status: json['status'] ?? 'INITIATED',
       notes: json['notes'],
-      measurementsCount: json['measurementsCount'] ?? json['measurements_count'] ?? 0,
-      quotationsCount: json['quotationsCount'] ?? json['quotations_count'] ?? 0,
-      createdAt: DateTime.tryParse(json['createdAt'] ?? json['created_at'] ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(json['updatedAt'] ?? json['updated_at'] ?? '') ?? DateTime.now(),
+      measurementsCount: json['measurementsCount'] ?? 0,
+      quotationsCount: json['quotationsCount'] ?? 0,
+      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
     );
   }
 
