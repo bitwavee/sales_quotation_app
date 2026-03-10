@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
-import '../../models/enquiry_model.dart';
+
 import '../../providers/enquiry_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/staff_provider.dart';
@@ -15,307 +15,275 @@ class EnquiryListScreen extends StatefulWidget {
 }
 
 class _EnquiryListScreenState extends State<EnquiryListScreen> {
+  bool _showCreateForm = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<EnquiryProvider>().loadEnquiries();
+      context.read<StaffProvider>().loadStaff();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    context.watch<AuthProvider>().user?.isAdmin ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: Text(isAdmin ? 'All Enquiries' : 'My Enquiries')),
-      body: Consumer<EnquiryProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading && provider.enquiries.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (provider.error != null && provider.enquiries.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(provider.error!, style: const TextStyle(color: AppColors.danger)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(onPressed: () => provider.loadEnquiries(), child: const Text('Retry')),
-                ],
-              ),
-            );
-          }
-          if (provider.enquiries.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.assignment_outlined, size: 64, color: AppColors.textLight),
-                  const SizedBox(height: 16),
-                  Text('No enquiries yet', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textMuted)),
-                ],
-              ),
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: () => provider.loadEnquiries(),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: provider.enquiries.length,
-              itemBuilder: (context, index) {
-                final enquiry = provider.enquiries[index];
-                return _EnquiryCard(
-                  enquiry: enquiry,
-                  isAdmin: isAdmin,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => EnquiryDetailScreen(enquiryId: enquiry.id)),
-                    );
-                  },
-                );
-              },
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateEnquiryDialog(context),
-        icon: const Icon(Icons.add),
-        label: const Text('New Enquiry'),
-      ),
-    );
-  }
-
-  void _showCreateEnquiryDialog(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
-    final addressCtrl = TextEditingController();
-    final notesCtrl = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Create Enquiry'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Customer Name *')),
-              const SizedBox(height: 8),
-              TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Customer Phone *'), keyboardType: TextInputType.phone),
-              const SizedBox(height: 8),
-              TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Customer Email'), keyboardType: TextInputType.emailAddress),
-              const SizedBox(height: 8),
-              TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Customer Address'), maxLines: 2),
-              const SizedBox(height: 8),
-              TextField(controller: notesCtrl, decoration: const InputDecoration(labelText: 'Notes'), maxLines: 2),
-            ],
-          ),
+      appBar: AppBar(
+        title: const Text('Enquiry Create/Assign'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameCtrl.text.isEmpty || phoneCtrl.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name and phone are required')));
-                return;
-              }
-              Navigator.pop(ctx);
-              final data = <String, dynamic>{
-                'customerName': nameCtrl.text.trim(),
-                'customerPhone': phoneCtrl.text.trim(),
-              };
-              if (emailCtrl.text.isNotEmpty) data['customerEmail'] = emailCtrl.text.trim();
-              if (addressCtrl.text.isNotEmpty) data['customerAddress'] = addressCtrl.text.trim();
-              if (notesCtrl.text.isNotEmpty) data['notes'] = notesCtrl.text.trim();
-
-              final success = await context.read<EnquiryProvider>().createEnquiry(data);
-              if (success && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enquiry created')));
-              }
-            },
-            child: const Text('Create'),
+          IconButton(
+            icon: Icon(_showCreateForm ? Icons.list : Icons.add),
+            onPressed: () => setState(() => _showCreateForm = !_showCreateForm),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _EnquiryCard extends StatelessWidget {
-  final Enquiry enquiry;
-  final bool isAdmin;
-  final VoidCallback onTap;
-  const _EnquiryCard({required this.enquiry, required this.isAdmin, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_showCreateForm) ...[
+              // Description header with lock icon
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(enquiry.enquiryNumber, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                  _StatusBadge(status: enquiry.status),
+                  Text('Description', style: Theme.of(context).textTheme.titleLarge),
+                  const Icon(Icons.lock_outline, size: 20, color: AppColors.textMuted),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(enquiry.customerName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              Text(enquiry.customerPhone, style: const TextStyle(color: AppColors.textMuted)),
-              if (enquiry.assignedStaff != null) ...[
-                const SizedBox(height: 4),
-                Text('Staff: ${enquiry.assignedStaff}', style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
-              ],
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _CountChip(icon: Icons.straighten, label: '${enquiry.measurementsCount}'),
-                  const SizedBox(width: 8),
-                  _CountChip(icon: Icons.description, label: '${enquiry.quotationsCount}'),
-                ],
-              ),
-              if (isAdmin) ...[
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => _showAssignDialog(context, enquiry),
-                      icon: const Icon(Icons.person_add, size: 16),
-                      label: const Text('Assign', style: TextStyle(fontSize: 12)),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _confirmDelete(context, enquiry),
-                      icon: const Icon(Icons.delete, size: 16, color: AppColors.danger),
-                      label: const Text('Delete', style: TextStyle(fontSize: 12, color: AppColors.danger)),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showAssignDialog(BuildContext context, Enquiry enquiry) {
-    final staffProvider = context.read<StaffProvider>();
-    staffProvider.loadStaff();
-    String? selectedStaffId;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Assign Staff'),
-          content: Consumer<StaffProvider>(
-            builder: (context, sp, _) {
-              if (sp.isLoading) return const SizedBox(height: 50, child: Center(child: CircularProgressIndicator()));
-              if (sp.staffList.isEmpty) return const Text('No staff available');
-              return DropdownButtonFormField<String>(
-                value: selectedStaffId,
-                decoration: const InputDecoration(labelText: 'Select Staff'),
-                items: sp.staffList
-                    .where((s) => s.isActive)
-                    .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name)))
-                    .toList(),
-                onChanged: (v) => setDialogState(() => selectedStaffId = v),
-              );
-            },
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                if (selectedStaffId == null) return;
-                Navigator.pop(ctx);
-                final success = await staffProvider.assignEnquiry(enquiry.id, selectedStaffId!);
-                if (success) {
+              const SizedBox(height: 16),
+              _CreateEnquiryForm(
+                onCreated: () {
+                  setState(() => _showCreateForm = false);
                   context.read<EnquiryProvider>().loadEnquiries();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff assigned')));
+                },
+              ),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 16),
+            ],
+
+            // Enquiry List Table
+            Consumer<EnquiryProvider>(
+              builder: (context, provider, _) {
+                if (provider.isLoading && provider.enquiries.isEmpty) {
+                  return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()));
                 }
+                if (provider.error != null && provider.enquiries.isEmpty) {
+                  return Center(
+                    child: Column(
+                      children: [
+                        Text(provider.error!, style: const TextStyle(color: AppColors.danger)),
+                        const SizedBox(height: 12),
+                        ElevatedButton(onPressed: () => provider.loadEnquiries(), child: const Text('Retry')),
+                      ],
+                    ),
+                  );
+                }
+                if (provider.enquiries.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        children: [
+                          Icon(Icons.assignment_outlined, size: 48, color: AppColors.textLight),
+                          const SizedBox(height: 12),
+                          const Text('No enquiries yet', style: TextStyle(color: AppColors.textMuted)),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Table header
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: AppColors.border)),
+                      ),
+                      child: const Row(
+                        children: [
+                          SizedBox(width: 36, child: Text('ID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                          Expanded(flex: 3, child: Text('Customer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                          Expanded(flex: 2, child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                          Expanded(flex: 2, child: Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                        ],
+                      ),
+                    ),
+                    // Table rows
+                    ...provider.enquiries.asMap().entries.map((entry) {
+                      final idx = entry.key + 1;
+                      final e = entry.value;
+                      return InkWell(
+                        onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => EnquiryDetailScreen(enquiryId: e.id)));
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: const BoxDecoration(
+                            border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+                          ),
+                          child: Row(
+                            children: [
+                              SizedBox(width: 36, child: Text('$idx', style: const TextStyle(fontSize: 13))),
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(e.customerName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                    Text(e.customerPhone, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(e.status.replaceAll('_', ' '), style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  '${e.createdAt.day.toString().padLeft(2, '0')}/${e.createdAt.month.toString().padLeft(2, '0')}/${e.createdAt.year.toString().substring(2)}',
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                );
               },
-              child: const Text('Assign'),
             ),
           ],
         ),
       ),
+      floatingActionButton: !_showCreateForm
+          ? FloatingActionButton(
+              onPressed: () => setState(() => _showCreateForm = true),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
+}
 
-  void _confirmDelete(BuildContext context, Enquiry enquiry) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Enquiry'),
-        content: Text('Delete ${enquiry.enquiryNumber}?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await context.read<EnquiryProvider>().deleteEnquiry(enquiry.id);
-            },
-            child: const Text('Delete'),
+// ========== CREATE ENQUIRY FORM ==========
+class _CreateEnquiryForm extends StatefulWidget {
+  final VoidCallback onCreated;
+  const _CreateEnquiryForm({required this.onCreated});
+
+  @override
+  State<_CreateEnquiryForm> createState() => _CreateEnquiryFormState();
+}
+
+class _CreateEnquiryFormState extends State<_CreateEnquiryForm> {
+  final _titleCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _contactCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  String? _selectedStaffId;
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _contactCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Package Title', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
+        const SizedBox(height: 4),
+        TextField(controller: _titleCtrl, decoration: const InputDecoration(hintText: 'Enter package title')),
+        const SizedBox(height: 12),
+        TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Customer Name')),
+        const SizedBox(height: 12),
+        TextField(controller: _phoneCtrl, decoration: const InputDecoration(labelText: 'Contact'), keyboardType: TextInputType.phone),
+        const SizedBox(height: 12),
+        TextField(controller: _contactCtrl, decoration: const InputDecoration(labelText: 'Contact Email'), keyboardType: TextInputType.emailAddress),
+        const SizedBox(height: 12),
+        TextField(controller: _descCtrl, decoration: const InputDecoration(labelText: 'Description'), maxLines: 3),
+        const SizedBox(height: 16),
+
+        // Assign Staff Dropdown
+        Text('Assign Staff', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
+        const SizedBox(height: 4),
+        Consumer<StaffProvider>(
+          builder: (context, sp, _) {
+            if (sp.staffList.isEmpty) {
+              return const TextField(
+                enabled: false,
+                decoration: InputDecoration(hintText: 'No staff available'),
+              );
+            }
+            return DropdownButtonFormField<String>(
+              value: _selectedStaffId,
+              decoration: const InputDecoration(hintText: 'Select staff member'),
+              items: sp.staffList
+                  .where((s) => s.isActive)
+                  .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name)))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedStaffId = v),
+            );
+          },
+        ),
+        const SizedBox(height: 20),
+
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton(
+            onPressed: _create,
+            child: const Text('Create Enquiry'),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
-}
 
-class _StatusBadge extends StatelessWidget {
-  final String status;
-  const _StatusBadge({required this.status});
+  Future<void> _create() async {
+    if (_nameCtrl.text.isEmpty || _phoneCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer name and contact are required')));
+      return;
+    }
+    final data = <String, dynamic>{
+      'customerName': _nameCtrl.text.trim(),
+      'customerPhone': _phoneCtrl.text.trim(),
+    };
+    if (_contactCtrl.text.isNotEmpty) data['customerEmail'] = _contactCtrl.text.trim();
+    if (_descCtrl.text.isNotEmpty) data['notes'] = _descCtrl.text.trim();
+    if (_titleCtrl.text.isNotEmpty) data['packageTitle'] = _titleCtrl.text.trim();
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(status.replaceAll('_', ' '), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.warning)),
-    );
-  }
-}
-
-class _CountChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _CountChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: AppColors.textMuted),
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-        ],
-      ),
-    );
+    final success = await context.read<EnquiryProvider>().createEnquiry(data);
+    if (success && mounted) {
+      // If staff is selected, assign them
+      if (_selectedStaffId != null) {
+        final enquiries = context.read<EnquiryProvider>().enquiries;
+        if (enquiries.isNotEmpty) {
+          await context.read<StaffProvider>().assignEnquiry(enquiries.last.id, _selectedStaffId!);
+        }
+      }
+      widget.onCreated();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enquiry created')));
+    }
   }
 }

@@ -23,7 +23,13 @@ class _EnquiryStatusConfigScreenState extends State<EnquiryStatusConfigScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Enquiry Status Config')),
+      appBar: AppBar(
+        title: const Text('Enquiry Status Configuration'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Consumer<EnquiryStatusConfigProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading && provider.configs.isEmpty) {
@@ -35,24 +41,70 @@ class _EnquiryStatusConfigScreenState extends State<EnquiryStatusConfigScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(provider.error!, style: const TextStyle(color: AppColors.danger)),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   ElevatedButton(onPressed: () => provider.loadConfigs(), child: const Text('Retry')),
                 ],
               ),
             );
           }
-          if (provider.configs.isEmpty) {
-            return const Center(child: Text('No status configurations found'));
-          }
-          return RefreshIndicator(
-            onRefresh: () => provider.loadConfigs(),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: provider.configs.length,
-              itemBuilder: (context, index) {
-                final config = provider.configs[index];
-                return _ConfigCard(config: config);
-              },
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Statuses Section
+                Text('Statuses', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 4),
+                Text('Status', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
+                const SizedBox(height: 12),
+
+                // Status Chips
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: provider.configs.map((config) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: config.isActive ? AppColors.primary : AppColors.chipBackground,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: config.isActive ? AppColors.primary : AppColors.border,
+                        ),
+                      ),
+                      child: Text(
+                        config.statusName,
+                        style: TextStyle(
+                          color: config.isActive ? Colors.white : AppColors.textDark,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+
+                // Configurable fields section
+                Text('Configurable', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
+                const SizedBox(height: 8),
+
+                // Per-status requirement config
+                ...provider.configs.map((config) => _StatusConfigCard(config: config)),
+                const SizedBox(height: 16),
+
+                // Required fields section header
+                Text('Per enquiry requirements', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
+                const SizedBox(height: 8),
+
+                // Field requirement toggles
+                _FieldRequirement(label: 'Contact', icon: Icons.lock_outline),
+                const SizedBox(height: 8),
+                _FieldRequirement(label: 'Description', icon: Icons.lock_outline),
+                const SizedBox(height: 8),
+                _FieldRequirement(label: 'Budget', icon: null, isDropdown: true),
+              ],
             ),
           );
         },
@@ -116,46 +168,58 @@ class _EnquiryStatusConfigScreenState extends State<EnquiryStatusConfigScreen> {
   }
 }
 
-class _ConfigCard extends StatelessWidget {
+class _StatusConfigCard extends StatelessWidget {
   final EnquiryStatusConfig config;
-  const _ConfigCard({required this.config});
+  const _StatusConfigCard({required this.config});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: _parseColor(config.color) ?? AppColors.primary,
-          child: Text('${config.displayOrder}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
-        title: Text(config.statusName, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
           children: [
-            Text('Key: ${config.statusKey}'),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              width: 8,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _parseColor(config.color) ?? AppColors.primary,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(config.statusName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                  Text('Key: ${config.statusKey} | Order: ${config.displayOrder}',
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: config.isActive ? AppColors.success.withOpacity(0.1) : AppColors.danger.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 config.isActive ? 'Active' : 'Inactive',
-                style: TextStyle(fontSize: 12, color: config.isActive ? AppColors.success : AppColors.danger),
+                style: TextStyle(fontSize: 11, color: config.isActive ? AppColors.success : AppColors.danger),
               ),
             ),
-          ],
-        ),
-        isThreeLine: true,
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'edit') _showEditDialog(context, config);
-            if (value == 'delete') _confirmDelete(context, config);
-          },
-          itemBuilder: (_) => [
-            const PopupMenuItem(value: 'edit', child: Text('Edit')),
-            const PopupMenuItem(value: 'delete', child: Text('Delete')),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'edit') _showEditDialog(context, config);
+                if (value == 'delete') _confirmDelete(context, config);
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                const PopupMenuItem(value: 'delete', child: Text('Delete')),
+              ],
+            ),
           ],
         ),
       ),
@@ -166,7 +230,7 @@ class _ConfigCard extends StatelessWidget {
     if (hex == null || hex.isEmpty) return null;
     hex = hex.replaceFirst('#', '');
     if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.tryParse('0x$hex') ?? 0xFF0099FF);
+    return Color(int.tryParse('0x$hex') ?? 0xFF1B1F3B);
   }
 
   void _showEditDialog(BuildContext context, EnquiryStatusConfig config) {
@@ -210,9 +274,7 @@ class _ConfigCard extends StatelessWidget {
                 };
                 if (colorCtrl.text.isNotEmpty) data['color'] = colorCtrl.text.trim();
                 final success = await context.read<EnquiryStatusConfigProvider>().updateConfig(config.id, data);
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Config updated')));
-                }
+                if (success) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Config updated')));
               },
               child: const Text('Save'),
             ),
@@ -235,12 +297,43 @@ class _ConfigCard extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               final success = await context.read<EnquiryStatusConfigProvider>().deleteConfig(config.id);
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Config deleted')));
-              }
+              if (success) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Config deleted')));
             },
             child: const Text('Delete'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FieldRequirement extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final bool isDropdown;
+  const _FieldRequirement({required this.label, this.icon, this.isDropdown = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          if (icon != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Icon(icon, size: 18, color: AppColors.textMuted),
+            ),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
+          if (isDropdown)
+            const Icon(Icons.keyboard_arrow_down, color: AppColors.textMuted)
+          else
+            const Icon(Icons.lock_outline, size: 18, color: AppColors.textMuted),
         ],
       ),
     );

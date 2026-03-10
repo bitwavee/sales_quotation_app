@@ -11,176 +11,195 @@ class MaterialManagementScreen extends StatefulWidget {
   State<MaterialManagementScreen> createState() => _MaterialManagementScreenState();
 }
 
-class _MaterialManagementScreenState extends State<MaterialManagementScreen> {
+class _MaterialManagementScreenState extends State<MaterialManagementScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MaterialProvider>().loadMaterials();
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Material Management')),
-      body: Consumer<MaterialProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading && provider.materials.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (provider.error != null && provider.materials.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(provider.error!, style: const TextStyle(color: AppColors.danger)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(onPressed: () => provider.loadMaterials(), child: const Text('Retry')),
-                ],
-              ),
-            );
-          }
-          if (provider.materials.isEmpty) {
-            return const Center(child: Text('No materials found'));
-          }
-          return RefreshIndicator(
-            onRefresh: () => provider.loadMaterials(),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: provider.materials.length,
-              itemBuilder: (context, index) {
-                final material = provider.materials[index];
-                return _MaterialCard(material: material);
-              },
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateDialog(context),
-        child: const Icon(Icons.add),
-      ),
-    );
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
-  void _showCreateDialog(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final costCtrl = TextEditingController();
-    String selectedUnit = 'sqft';
-    final units = ['sqft', 'meter', 'piece', 'kg'];
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Create Material'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name *')),
-                const SizedBox(height: 8),
-                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description'), maxLines: 2),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: selectedUnit,
-                  decoration: const InputDecoration(labelText: 'Unit *'),
-                  items: units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                  onChanged: (v) => setDialogState(() => selectedUnit = v!),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: costCtrl,
-                  decoration: const InputDecoration(labelText: 'Base Cost *'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameCtrl.text.isEmpty || costCtrl.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name and cost are required')));
-                  return;
-                }
-                final cost = double.tryParse(costCtrl.text);
-                if (cost == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid cost')));
-                  return;
-                }
-                Navigator.pop(ctx);
-                final data = {
-                  'name': nameCtrl.text.trim(),
-                  'unit': selectedUnit,
-                  'baseCost': cost,
-                };
-                if (descCtrl.text.isNotEmpty) data['description'] = descCtrl.text.trim();
-                final success = await context.read<MaterialProvider>().createMaterial(data);
-                if (success && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Material created')));
-                }
-              },
-              child: const Text('Create'),
-            ),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Material Management'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.textMuted,
+          indicatorColor: AppColors.primary,
+          tabs: const [
+            Tab(text: 'Create'),
+            Tab(text: 'CRUD'),
+            Tab(text: 'Delete'),
+            Tab(text: 'Price'),
           ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _CreateMaterialTab(),
+          _CrudMaterialTab(),
+          _DeleteMaterialTab(),
+          _PriceMaterialTab(),
+        ],
       ),
     );
   }
 }
 
-class _MaterialCard extends StatelessWidget {
+// ========== CREATE TAB ==========
+class _CreateMaterialTab extends StatefulWidget {
+  @override
+  State<_CreateMaterialTab> createState() => _CreateMaterialTabState();
+}
+
+class _CreateMaterialTabState extends State<_CreateMaterialTab> {
+  final _nameCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _costCtrl = TextEditingController();
+  String _selectedUnit = 'sqft';
+  final _units = ['sqft', 'meter', 'piece', 'kg'];
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    _costCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Material Name *')),
+          const SizedBox(height: 12),
+          TextField(controller: _descCtrl, decoration: const InputDecoration(labelText: 'Description'), maxLines: 2),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _selectedUnit,
+            decoration: const InputDecoration(labelText: 'Unit *'),
+            items: _units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+            onChanged: (v) => setState(() => _selectedUnit = v!),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _costCtrl,
+            decoration: const InputDecoration(labelText: 'Base Cost *', prefixText: '\$ '),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _create,
+              child: const Text('Create Material'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _create() async {
+    if (_nameCtrl.text.isEmpty || _costCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name and cost are required')));
+      return;
+    }
+    final cost = double.tryParse(_costCtrl.text);
+    if (cost == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid cost')));
+      return;
+    }
+    final data = <String, dynamic>{
+      'name': _nameCtrl.text.trim(),
+      'unit': _selectedUnit,
+      'baseCost': cost,
+    };
+    if (_descCtrl.text.isNotEmpty) data['description'] = _descCtrl.text.trim();
+    final success = await context.read<MaterialProvider>().createMaterial(data);
+    if (success && mounted) {
+      _nameCtrl.clear();
+      _descCtrl.clear();
+      _costCtrl.clear();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Material created')));
+    }
+  }
+}
+
+// ========== CRUD TAB ==========
+class _CrudMaterialTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<MaterialProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.materials.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (provider.materials.isEmpty) {
+          return const Center(child: Text('No materials found'));
+        }
+        return RefreshIndicator(
+          onRefresh: () => provider.loadMaterials(),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: provider.materials.length,
+            itemBuilder: (context, index) {
+              final material = provider.materials[index];
+              return _MaterialEditCard(material: material);
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MaterialEditCard extends StatelessWidget {
   final MaterialItem material;
-  const _MaterialCard({required this.material});
+  const _MaterialEditCard({required this.material});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: material.isActive ? AppColors.primary : AppColors.textLight,
-          child: const Icon(Icons.inventory_2, color: Colors.white),
+          child: const Icon(Icons.inventory_2, color: Colors.white, size: 18),
         ),
         title: Text(material.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (material.description != null) Text(material.description!),
-            Text('Unit: ${material.unit} | Cost: ₹${material.baseCost.toStringAsFixed(2)}'),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: material.isActive ? AppColors.success.withOpacity(0.1) : AppColors.danger.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                material.isActive ? 'Active' : 'Inactive',
-                style: TextStyle(fontSize: 12, color: material.isActive ? AppColors.success : AppColors.danger),
-              ),
-            ),
-          ],
-        ),
-        isThreeLine: true,
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'edit') _showEditDialog(context, material);
-            if (value == 'delete') _confirmDelete(context, material);
-          },
-          itemBuilder: (_) => [
-            const PopupMenuItem(value: 'edit', child: Text('Edit')),
-            const PopupMenuItem(value: 'delete', child: Text('Delete')),
-          ],
+        subtitle: Text('${material.unit} | \$${material.baseCost.toStringAsFixed(2)}'),
+        trailing: IconButton(
+          icon: const Icon(Icons.edit, color: AppColors.primary),
+          onPressed: () => _showEditDialog(context),
         ),
       ),
     );
   }
 
-  void _showEditDialog(BuildContext context, MaterialItem material) {
+  void _showEditDialog(BuildContext context) {
     final nameCtrl = TextEditingController(text: material.name);
     final descCtrl = TextEditingController(text: material.description ?? '');
     final costCtrl = TextEditingController(text: material.baseCost.toString());
@@ -208,17 +227,9 @@ class _MaterialCard extends StatelessWidget {
                   onChanged: (v) => setDialogState(() => selectedUnit = v!),
                 ),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: costCtrl,
-                  decoration: const InputDecoration(labelText: 'Base Cost'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
+                TextField(controller: costCtrl, decoration: const InputDecoration(labelText: 'Base Cost'), keyboardType: const TextInputType.numberWithOptions(decimal: true)),
                 const SizedBox(height: 8),
-                SwitchListTile(
-                  title: const Text('Active'),
-                  value: isActive,
-                  onChanged: (v) => setDialogState(() => isActive = v),
-                ),
+                SwitchListTile(title: const Text('Active'), value: isActive, onChanged: (v) => setDialogState(() => isActive = v)),
               ],
             ),
           ),
@@ -240,15 +251,49 @@ class _MaterialCard extends StatelessWidget {
                 };
                 if (descCtrl.text.isNotEmpty) data['description'] = descCtrl.text.trim();
                 final success = await context.read<MaterialProvider>().updateMaterial(material.id, data);
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Material updated')));
-                }
+                if (success) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Material updated')));
               },
               child: const Text('Save'),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+// ========== DELETE TAB ==========
+class _DeleteMaterialTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<MaterialProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.materials.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (provider.materials.isEmpty) {
+          return const Center(child: Text('No materials found'));
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: provider.materials.length,
+          itemBuilder: (context, index) {
+            final material = provider.materials[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: const Icon(Icons.inventory_2, color: AppColors.textMuted),
+                title: Text(material.name),
+                subtitle: Text('\$${material.baseCost.toStringAsFixed(2)}'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete, color: AppColors.danger),
+                  onPressed: () => _confirmDelete(context, material),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -265,14 +310,53 @@ class _MaterialCard extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               final success = await context.read<MaterialProvider>().deleteMaterial(material.id);
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Material deleted')));
-              }
+              if (success) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Material deleted')));
             },
             child: const Text('Delete'),
           ),
         ],
       ),
+    );
+  }
+}
+
+// ========== PRICE TAB ==========
+class _PriceMaterialTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<MaterialProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.materials.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (provider.materials.isEmpty) {
+          return const Center(child: Text('No materials found'));
+        }
+        return RefreshIndicator(
+          onRefresh: () => provider.loadMaterials(),
+          child: ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: provider.materials.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final material = provider.materials[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(material.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                    Text(
+                      '\$ ${material.baseCost.toStringAsFixed(material.baseCost.truncateToDouble() == material.baseCost ? 0 : 2)}0',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

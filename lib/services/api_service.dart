@@ -11,6 +11,16 @@ class ApiService {
   static const String _tokenKey = 'jwt_token';
   static const Duration _timeout = Duration(seconds: 30);
 
+  /// Adds Host header override when connecting via 10.0.2.2 on Android emulator.
+  /// IIS is bound to 'localhost' and rejects requests with Host: 10.0.2.2.
+  static Map<String, String> _applyHostOverride(Map<String, String> headers) {
+    if (ApiConfig.needsHostOverride) {
+      headers['Host'] = ApiConfig.hostOverride;
+      debugPrint('[ApiService] Host header overridden to: ${ApiConfig.hostOverride}');
+    }
+    return headers;
+  }
+
   /// Creates an HTTP client that accepts self-signed certificates in development.
   static http.Client _createClient() {
     if (ApiConfig.isDevelopment) {
@@ -44,7 +54,7 @@ class ApiService {
 
       final response = await client.post(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
+        headers: _applyHostOverride({'Content-Type': 'application/json'}),
         body: jsonEncode({'email': email, 'password': password}),
       ).timeout(_timeout);
 
@@ -305,7 +315,7 @@ class ApiService {
       final token = await _getToken();
       final response = await client.get(
         Uri.parse(url),
-        headers: {if (token != null) 'Authorization': 'Bearer $token'},
+        headers: _applyHostOverride({if (token != null) 'Authorization': 'Bearer $token'}),
       ).timeout(_timeout);
       stopwatch.stop();
       debugPrint('[API GET PDF] quotation/$id/pdf -> ${response.statusCode} (${stopwatch.elapsedMilliseconds}ms, ${response.bodyBytes.length} bytes)');
@@ -327,7 +337,7 @@ class ApiService {
       final token = await _getToken();
       final response = await client.get(
         Uri.parse(url),
-        headers: {if (token != null) 'Authorization': 'Bearer $token'},
+        headers: _applyHostOverride({if (token != null) 'Authorization': 'Bearer $token'}),
       ).timeout(_timeout);
       stopwatch.stop();
       debugPrint('[API DOWNLOAD PDF] quotation/$id/download-pdf -> ${response.statusCode} (${stopwatch.elapsedMilliseconds}ms, ${response.bodyBytes.length} bytes)');
@@ -353,6 +363,7 @@ class ApiService {
       final uri = Uri.parse(url);
       final request = http.MultipartRequest('POST', uri);
       if (token != null) request.headers['Authorization'] = 'Bearer $token';
+      if (ApiConfig.needsHostOverride) request.headers['Host'] = ApiConfig.hostOverride;
       request.files.add(await http.MultipartFile.fromPath('file', file.path));
       final streamed = await client.send(request).timeout(_timeout);
       final response = await http.Response.fromStream(streamed);
@@ -385,7 +396,7 @@ class ApiService {
       final token = await _getToken();
       final response = await client.get(
         Uri.parse(url),
-        headers: {if (token != null) 'Authorization': 'Bearer $token'},
+        headers: _applyHostOverride({if (token != null) 'Authorization': 'Bearer $token'}),
       ).timeout(_timeout);
       stopwatch.stop();
       debugPrint('[API DOWNLOAD] file/$id -> ${response.statusCode} (${stopwatch.elapsedMilliseconds}ms, ${response.bodyBytes.length} bytes)');
@@ -411,10 +422,10 @@ class ApiService {
     final stopwatch = Stopwatch()..start();
     try {
       final token = await _getToken();
-      final headers = {
+      final headers = _applyHostOverride({
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
-      };
+      });
 
       final response = await client.get(
         Uri.parse(url),
@@ -462,10 +473,10 @@ class ApiService {
     final stopwatch = Stopwatch()..start();
     try {
       final token = await _getToken();
-      final headers = {
+      final headers = _applyHostOverride({
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
-      };
+      });
 
       final response = await client.post(
         Uri.parse(url),
@@ -514,10 +525,10 @@ class ApiService {
     final stopwatch = Stopwatch()..start();
     try {
       final token = await _getToken();
-      final headers = {
+      final headers = _applyHostOverride({
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
-      };
+      });
 
       final response = await client.put(
         Uri.parse(url),
@@ -565,10 +576,10 @@ class ApiService {
     final stopwatch = Stopwatch()..start();
     try {
       final token = await _getToken();
-      final headers = {
+      final headers = _applyHostOverride({
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
-      };
+      });
 
       final response = await client.delete(
         Uri.parse(url),
